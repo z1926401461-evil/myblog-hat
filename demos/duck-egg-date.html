@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>孵化日历推算</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f2ea;
+    --bg-gradient: linear-gradient(180deg, #f8f3ea 0%, #eee3d2 100%);
+    --panel-bg: #fffdfa;
+    --panel-border: #eae0cf;
+    --text-main: #2f2418;
+    --text-muted: #8d7a66;
+    --text-faint: #bfae98;
+    --accent: #f5b13d;
+    --accent-dark: #c26613;
+    --slot-bg: #faf5ec;
+    --slot-border: #e9dfcd;
+  }
+
+  html, body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--bg-gradient);
+    background-attachment: fixed;
+    color: var(--text-main);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body { padding: 12px; min-height: 100vh; }
+
+  /* ============ 顶部栏 ============ */
+  .topbar {
+    background: var(--panel-bg);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow:
+      0 1px 2px rgba(31, 42, 51, 0.04),
+      0 4px 16px rgba(31, 42, 51, 0.06);
+    border: 1px solid var(--panel-border);
+  }
+
+  .clock {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--text-main);
+    letter-spacing: 0.3px;
+  }
+  .clock .live-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4caf50;
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.5);
+    animation: pulse-dot 2s infinite;
+    flex-shrink: 0;
+  }
+  @keyframes pulse-dot {
+    0%   { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.5); }
+    70%  { box-shadow: 0 0 0 8px rgba(76, 175, 80, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+  }
+
+  .config {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    align-items: center;
+    font-size: 12px;
+  }
+
+  .config label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .config input {
+    border: 1px solid #eadfcd;
+    border-radius: 7px;
+    padding: 5px 8px;
+    font-size: 12px;
+    font-family: inherit;
+    background: #faf5ec;
+    color: var(--text-main);
+    outline: none;
+    transition: all 0.15s ease;
+    font-weight: 600;
+  }
+  .config input:hover { border-color: #d8c9b2; }
+  .config input:focus {
+    border-color: var(--accent);
+    background: #fffdfa;
+    box-shadow: 0 0 0 3px rgba(242, 201, 76, 0.18);
+  }
+  .config input[type="number"] { width: 46px; text-align: center; }
+  .config input[type="datetime-local"] { width: 180px; }
+
+  /* ============ 面板 ============ */
+  .panel {
+    background: var(--panel-bg);
+    border-radius: 14px;
+    padding: 12px 14px 14px;
+    margin-bottom: 12px;
+    box-shadow:
+      0 1px 2px rgba(31, 42, 51, 0.04),
+      0 4px 16px rgba(31, 42, 51, 0.06);
+    border: 1px solid var(--panel-border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      var(--accent) 20%,
+      var(--accent-dark) 50%,
+      var(--accent) 80%,
+      transparent 100%);
+    opacity: 0.65;
+  }
+
+  .panel-header {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    margin-top: 2px;
+  }
+
+  .panel-header input {
+    border: 1px solid #eae0cf;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    font-family: inherit;
+    background: #faf5ec;
+    color: var(--text-main);
+    outline: none;
+    min-width: 0;
+    transition: all 0.15s ease;
+  }
+  .panel-header input:hover { border-color: #cbbba1; }
+  .panel-header input:focus {
+    border-color: var(--accent);
+    background: #fffdfa;
+    box-shadow: 0 0 0 3px rgba(242, 201, 76, 0.15);
+  }
+
+  .panel-header .p-title {
+    flex: 0 0 140px;
+    font-weight: 700;
+    color: var(--text-main);
+  }
+
+  .panel-header .p-note {
+    flex: 1;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .panel-header .p-note::placeholder {
+    color: var(--text-faint);
+    font-style: italic;
+  }
+
+  /* ============ 车位行：入口 | 车位 | 出口 ============ */
+  .slots-row {
+    display: grid;
+    grid-template-columns: 18px 1fr 18px;
+    gap: 7px;
+    align-items: stretch;
+  }
+
+  .io-entry,
+  .io-exit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    border-radius: 6px;
+    padding: 10px 0;
+    user-select: none;
+  }
+
+  .io-entry {
+    color: #2e7d32;
+    background: linear-gradient(180deg, #e8f5e9, #c8e6c9);
+    border: 1px solid #a5d6a7;
+  }
+
+  .io-exit {
+    color: #c62828;
+    background: linear-gradient(180deg, #ffebee, #ffcdd2);
+    border: 1px solid #ef9a9a;
+  }
+
+  .slots-wrap {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .slot-labels {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    margin-bottom: 5px;
+    text-align: center;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--text-faint);
+    letter-spacing: 0.3px;
+  }
+
+  .slots {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    flex: 1;
+  }
+
+  .slot {
+    position: relative;
+    aspect-ratio: 1 / 1.5;
+    background: var(--slot-bg);
+    border: 1.5px solid var(--slot-border);
+    border-radius: 9px;
+    overflow: hidden;
+    transition: background-color 0.2s ease;
+  }
+
+  /* ============ 蛋车 ============ */
+  .car {
+    position: absolute;
+    inset: 3px;
+    border-radius: 7px;
+    border: 1.5px solid;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 3px 2px;
+    text-align: center;
+    overflow: hidden;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.7),
+      0 1px 3px rgba(31, 42, 51, 0.08);
+    animation: car-appear 0.35s ease;
+  }
+
+  @keyframes car-appear {
+    from { transform: scale(0.85); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+  }
+
+  .car .car-date {
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.15;
+    white-space: nowrap;
+    letter-spacing: -0.2px;
+  }
+
+  .car .car-age {
+    font-size: 10px;
+    line-height: 1.15;
+    opacity: 0.9;
+    white-space: nowrap;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.4);
+  }
+
+  /* ============ 免责声明 ============ */
+  .disclaimer {
+    margin: 16px 4px 24px;
+    text-align: center;
+    font-size: 11px;
+    color: #bfae98;
+    line-height: 1.6;
+    letter-spacing: 0.2px;
+  }
+
+  /* ============ 手机端进一步收紧 ============ */
+  @media (max-width: 500px) {
+    body { padding: 6px; font-size: 12px; }
+    .topbar { padding: 10px 12px; border-radius: 12px; margin-bottom: 8px; }
+    .clock { font-size: 12px; margin-bottom: 9px; gap: 7px; }
+    .clock .live-dot { width: 7px; height: 7px; }
+    .config { gap: 6px 10px; font-size: 11px; }
+    .config input { font-size: 11px; padding: 4px 6px; border-radius: 6px; }
+    .config input[type="number"] { width: 38px; }
+    .config input[type="datetime-local"] { width: 158px; }
+
+    .panel { padding: 10px 10px 12px; margin-bottom: 9px; border-radius: 12px; }
+    .panel-header { gap: 6px; margin-bottom: 9px; }
+    .panel-header input { padding: 5px 8px; font-size: 11.5px; border-radius: 6px; }
+    .panel-header .p-title { flex: 0 0 92px; }
+
+    .slots-row { grid-template-columns: 14px 1fr 14px; gap: 5px; }
+    .io-entry, .io-exit {
+      font-size: 8.5px;
+      letter-spacing: 2px;
+      border-radius: 5px;
+      padding: 8px 0;
+    }
+    .slot-labels { font-size: 8.5px; gap: 4px; margin-bottom: 4px; }
+    .slots { gap: 4px; }
+    .slot { border-radius: 7px; }
+
+    .car { inset: 2px; border-radius: 5px; gap: 2px; padding: 2px 1px; }
+    .car .car-date { font-size: 8.5px; }
+    .car .car-age { font-size: 8.5px; padding: 0 4px; border-radius: 3px; }
+
+    .disclaimer { font-size: 10px; margin: 12px 4px 18px; }
+  }
+
+  @media (max-width: 360px) {
+    .car .car-date { font-size: 8px; }
+    .car .car-age { font-size: 8px; }
+    .config input[type="datetime-local"] { width: 145px; }
+    .slots-row { grid-template-columns: 12px 1fr 12px; gap: 4px; }
+    .io-entry, .io-exit { font-size: 8px; letter-spacing: 1px; }
+    .slot-labels { font-size: 8px; gap: 3px; }
+  }
+
+        /* ===== 深色模式（跟随博客站点） ===== */
+        :root[data-theme="dark"] {
+            --bg: #17120e;
+            --bg-gradient: linear-gradient(180deg, #1e1812 0%, #14100c 100%);
+            --panel-bg: #221b15;
+            --panel-border: #3a3026;
+            --text-main: #f2e8dc;
+            --text-muted: #a4937e;
+            --text-faint: #7d6f5e;
+            --accent: #f5b13d;
+            --accent-dark: #e0912a;
+            --slot-bg: #241d17;
+            --slot-border: #3b3126;
+        }
+        :root[data-theme="dark"] body { color: var(--text-main); }
+        :root[data-theme="dark"] input,
+        :root[data-theme="dark"] select {
+            background: #1b1611 !important;
+            border-color: #40352a !important;
+            color: var(--text-main) !important;
+        }
+        :root[data-theme="dark"] .history-item,
+        :root[data-theme="dark"] .result-card,
+        :root[data-theme="dark"] .card {
+            background: var(--panel-bg) !important;
+            border-color: var(--panel-border) !important;
+        }
+        :root[data-theme="dark"] .io-entry {
+            color: #8fe095;
+            background: linear-gradient(180deg, #1f2a1f, #26332a);
+            border-color: #3c5b3f;
+        }
+        :root[data-theme="dark"] .io-exit {
+            color: #ff9a9a;
+            background: linear-gradient(180deg, #2c1d1d, #372424);
+            border-color: #6b3b3b;
+        }
+    </style>
+</head>
+<body>
+<script>
+/* 跟随宿主站点（博客）的深浅色；独立打开时跟随系统 */
+(function () {
+    var root = document.documentElement;
+    function apply(t) {
+        if (t === 'dark' || t === 'light') root.setAttribute('data-theme', t);
+    }
+    var pd = null;
+    try { if (window.parent && window.parent !== window) pd = window.parent.document; } catch (e) { pd = null; }
+    if (pd && pd.documentElement) {
+        apply(pd.documentElement.getAttribute('data-theme'));
+        try {
+            new MutationObserver(function () {
+                apply(pd.documentElement.getAttribute('data-theme'));
+            }).observe(pd.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        } catch (e) {}
+    } else {
+        // 与 Starlight 判断一致：以 light 是否匹配为准，两者都不匹配时按深色处理
+        var mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+        var mqLight = window.matchMedia('(prefers-color-scheme: light)');
+        var pick = function () { return mqDark.matches ? 'dark' : (mqLight.matches ? 'light' : 'dark'); };
+        apply(pick());
+        var onScheme = function () { apply(pick()); };
+        if (mqDark.addEventListener) { mqDark.addEventListener('change', onScheme); mqLight.addEventListener('change', onScheme); }
+    }
+})();
+</script>
+
+
+<div class="topbar">
+  <div class="clock">
+    <span class="live-dot"></span>
+    <span>当前时间：<span id="currentTime">--</span></span>
+  </div>
+  <div class="config">
+    <label>首批入孵：<input type="datetime-local" id="globalT0"></label>
+    <label>批次间隔：<input type="number" id="batchInterval" min="1" max="30" step="1">天</label>
+    <label>照蛋：<input type="number" id="hatchDays" min="1" max="30" step="1">天<input type="number" id="hatchHours" min="0" max="23" step="1">小时</label>
+    <label>落盘：<input type="number" id="dropDays" min="1" max="40" step="1">天<input type="number" id="dropHours" min="0" max="23" step="1">小时</label>
+  </div>
+</div>
+
+<div id="panels"></div>
+
+<div class="disclaimer">
+  本工具为个人免费参考工具，推算结果由输入参数自动计算得出，请以现场实际为准。
+</div>
+
+<script>
+/* ==========================================================
+   批次配色板
+   ========================================================== */
+const PALETTE = [
+  { bg: 'linear-gradient(180deg,#fff3c4,#ffe38a)', border: '#e0a800', text: '#7a5a00' },
+  { bg: 'linear-gradient(180deg,#d4f1d5,#a5dfa8)', border: '#4caf50', text: '#1b5e20' },
+  { bg: 'linear-gradient(180deg,#c8e0ff,#9cc4ff)', border: '#2196f3', text: '#0d47a1' },
+  { bg: 'linear-gradient(180deg,#ffe0c0,#ffc78a)', border: '#ff9800', text: '#b45309' },
+  { bg: 'linear-gradient(180deg,#ffd1d1,#ffa8a8)', border: '#f44336', text: '#7f1d1d' },
+  { bg: 'linear-gradient(180deg,#e0d4ff,#c4b0ff)', border: '#7e57c2', text: '#4527a0' },
+  { bg: 'linear-gradient(180deg,#d4f5f0,#a5e8df)', border: '#26a69a', text: '#00695c' },
+  { bg: 'linear-gradient(180deg,#ffd4ec,#ffa8d8)', border: '#ec407a', text: '#880e4f' }
+];
+const colorOf = (batchIndex) => PALETTE[batchIndex % PALETTE.length];
+
+/* ==========================================================
+   全局状态
+   ========================================================== */
+const state = {
+  globalT0: null,
+  batchIntervalDays: 5,
+  hatchDays: 11, hatchHours: 0,
+  dropDays: 24, dropHours: 0,
+  panels: [
+    { title: '1 号孵箱', note: '备注可编辑', offsetDays: 0 },
+    { title: '2 号孵箱', note: '备注可编辑', offsetDays: 1 },
+    { title: '3 号孵箱', note: '备注可编辑', offsetDays: 2 },
+    { title: '4 号孵箱', note: '备注可编辑', offsetDays: 3 },
+    { title: '5 号孵箱', note: '备注可编辑', offsetDays: 4 }
+  ]
+};
+
+/* 默认 T0：今天早上 5 点 */
+(function initDefaultT0() {
+  const d = new Date();
+  d.setHours(5, 0, 0, 0);
+  state.globalT0 = d;
+})();
+
+/* ==========================================================
+   localStorage 记忆
+   ========================================================== */
+const STORAGE_KEY = 'incubator-calendar-state-v1';
+
+function saveToStorage() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      globalT0: state.globalT0.toISOString(),
+      batchIntervalDays: state.batchIntervalDays,
+      hatchDays: state.hatchDays,
+      hatchHours: state.hatchHours,
+      dropDays: state.dropDays,
+      dropHours: state.dropHours,
+      panels: state.panels.map(p => ({ title: p.title, note: p.note }))
+    }));
+  } catch (e) { /* 忽略写入失败 */ }
+}
+
+(function restoreFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.globalT0) {
+      const d = new Date(data.globalT0);
+      if (!isNaN(d.getTime())) state.globalT0 = d;
+    }
+    if (data.batchIntervalDays) state.batchIntervalDays = data.batchIntervalDays;
+    if (data.hatchDays != null) state.hatchDays = data.hatchDays;
+    if (data.hatchHours != null) state.hatchHours = data.hatchHours;
+    if (data.dropDays != null) state.dropDays = data.dropDays;
+    if (data.dropHours != null) state.dropHours = data.dropHours;
+    if (Array.isArray(data.panels)) {
+      data.panels.forEach((p, i) => {
+        if (state.panels[i]) {
+          if (p.title != null) state.panels[i].title = p.title;
+          if (p.note != null) state.panels[i].note = p.note;
+        }
+      });
+    }
+  } catch (e) { /* 忽略解析失败 */ }
+})();
+
+/* ==========================================================
+   工具函数
+   ========================================================== */
+const HOUR = 3600 * 1000;
+const DAY = 24 * HOUR;
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function toLocalInputValue(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function formatDateTimeShort(d) {
+  return `${d.getMonth()+1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function formatAge(ms) {
+  const totalHours = Math.floor(ms / HOUR);
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  if (days === 0) return `${hours}小时`;
+  if (hours === 0) return `${days}天`;
+  return `${days}天${hours}小时`;
+}
+
+/* ==========================================================
+   核心：模拟一个面板到当前时间点的状态
+   ========================================================== */
+function simulatePanel(panel, now) {
+  const panelT0 = new Date(state.globalT0.getTime() + panel.offsetDays * DAY);
+  const batchIntervalMs = state.batchIntervalDays * DAY;
+  const hatchMs = (state.hatchDays * 24 + state.hatchHours) * HOUR;
+  const dropMs = (state.dropDays * 24 + state.dropHours) * HOUR;
+
+  const lookBackMs = dropMs + batchIntervalMs * 2;
+  let batchIndex = 0;
+  let tIn = panelT0.getTime();
+
+  while (tIn < now - lookBackMs) {
+    batchIndex++;
+    tIn = panelT0.getTime() + batchIndex * batchIntervalMs;
+  }
+
+  const events = [];
+  const batchTIns = {};
+  let t = tIn;
+  let bi = batchIndex;
+
+  while (t <= now) {
+    batchTIns[bi] = new Date(t);
+    events.push({ time: t, type: 'in', batch: bi });
+
+    const tHatch = t + hatchMs;
+    if (tHatch <= now) events.push({ time: tHatch, type: 'hatch', batch: bi });
+
+    const tDrop = t + dropMs;
+    if (tDrop <= now) events.push({ time: tDrop, type: 'drop', batch: bi });
+
+    bi++;
+    t = panelT0.getTime() + bi * batchIntervalMs;
+  }
+
+  const order = { drop: 0, in: 1, hatch: 2 };
+  events.sort((a, b) => {
+    if (a.time !== b.time) return a.time - b.time;
+    return order[a.type] - order[b.type];
+  });
+
+  let slots = [null, null, null, null, null];
+
+  for (const ev of events) {
+    if (ev.type === 'in') {
+      for (let i = 4; i > 0; i--) {
+        slots[i] = slots[i - 1];
+      }
+      slots[0] = ev.batch;
+    } else if (ev.type === 'hatch') {
+      const idx = slots.indexOf(ev.batch);
+      if (idx < 0) continue;
+      slots.splice(idx, 1);
+      slots.unshift(ev.batch);
+      while (slots.length > 5) slots.pop();
+      while (slots.length < 5) slots.push(null);
+    } else if (ev.type === 'drop') {
+      const idx = slots.indexOf(ev.batch);
+      if (idx >= 0) slots[idx] = null;
+    }
+  }
+
+  return { slots, batchTIns };
+}
+
+/* ==========================================================
+   渲染
+   ========================================================== */
+const panelsEl = document.getElementById('panels');
+const currentTimeEl = document.getElementById('currentTime');
+
+function buildPanelsDOM() {
+  panelsEl.innerHTML = '';
+  state.panels.forEach((panel, pi) => {
+    const panelDiv = document.createElement('div');
+    panelDiv.className = 'panel';
+    panelDiv.dataset.panelIndex = pi;
+
+    panelDiv.innerHTML = `
+      <div class="panel-header">
+        <input class="p-title" type="text" value="${panel.title.replace(/"/g,'&quot;')}" placeholder="标题">
+        <input class="p-note" type="text" value="${panel.note.replace(/"/g,'&quot;')}" placeholder="备注">
+      </div>
+      <div class="slots-row">
+        <div class="io-entry">入口</div>
+        <div class="slots-wrap">
+          <div class="slot-labels">
+            <span>1车位</span>
+            <span>2车位</span>
+            <span>3车位</span>
+            <span>4车位</span>
+            <span>5车位</span>
+          </div>
+          <div class="slots">
+            <div class="slot" data-slot="0"></div>
+            <div class="slot" data-slot="1"></div>
+            <div class="slot" data-slot="2"></div>
+            <div class="slot" data-slot="3"></div>
+            <div class="slot" data-slot="4"></div>
+          </div>
+        </div>
+        <div class="io-exit">出口</div>
+      </div>
+    `;
+
+    const titleInput = panelDiv.querySelector('.p-title');
+    const noteInput = panelDiv.querySelector('.p-note');
+    titleInput.addEventListener('input', (e) => {
+      panel.title = e.target.value;
+      saveToStorage();
+    });
+    noteInput.addEventListener('input', (e) => {
+      panel.note = e.target.value;
+      saveToStorage();
+    });
+
+    panelsEl.appendChild(panelDiv);
+  });
+}
+
+const carElements = new Map();
+
+function renderAll() {
+  const now = Date.now();
+
+  state.panels.forEach((panel, pi) => {
+    const { slots, batchTIns } = simulatePanel(panel, now);
+    const panelDiv = panelsEl.children[pi];
+    const slotEls = panelDiv.querySelectorAll('.slot');
+
+    const seen = new Set();
+
+    slots.forEach((batchIndex, si) => {
+      const slotEl = slotEls[si];
+      const key = `${pi}-${si}`;
+
+      if (batchIndex === null) {
+        const oldCar = carElements.get(key);
+        if (oldCar) {
+          oldCar.remove();
+          carElements.delete(key);
+        }
+        return;
+      }
+
+      seen.add(key);
+      const tIn = batchTIns[batchIndex];
+      const age = now - tIn.getTime();
+      const color = colorOf(batchIndex);
+
+      let carEl = carElements.get(key);
+
+      if (carEl && carEl.dataset.batch !== String(batchIndex)) {
+        carEl.remove();
+        carEl = null;
+        carElements.delete(key);
+      }
+
+      if (!carEl) {
+        carEl = document.createElement('div');
+        carEl.className = 'car';
+        carEl.dataset.batch = batchIndex;
+        carEl.style.background = color.bg;
+        carEl.style.borderColor = color.border;
+        carEl.style.color = color.text;
+        slotEl.appendChild(carEl);
+        carElements.set(key, carEl);
+      }
+
+      carEl.innerHTML = `
+        <div class="car-date">${formatDateTimeShort(tIn)}</div>
+        <div class="car-age">${formatAge(age)}</div>
+      `;
+    });
+
+    for (const [key, el] of Array.from(carElements.entries())) {
+      if (!key.startsWith(`${pi}-`)) continue;
+      if (!seen.has(key)) {
+        el.remove();
+        carElements.delete(key);
+      }
+    }
+  });
+}
+
+function updateClock() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const mo = pad2(now.getMonth() + 1);
+  const d = pad2(now.getDate());
+  const hh = pad2(now.getHours());
+  const mm = pad2(now.getMinutes());
+  const ss = pad2(now.getSeconds());
+  currentTimeEl.textContent = `${y}-${mo}-${d} ${hh}:${mm}:${ss}`;
+}
+
+function bindInputs() {
+  const t0Input = document.getElementById('globalT0');
+  const batchInput = document.getElementById('batchInterval');
+  const hdInput = document.getElementById('hatchDays');
+  const hhInput = document.getElementById('hatchHours');
+  const ddInput = document.getElementById('dropDays');
+  const dhInput = document.getElementById('dropHours');
+
+  t0Input.value = toLocalInputValue(state.globalT0);
+  batchInput.value = state.batchIntervalDays;
+  hdInput.value = state.hatchDays;
+  hhInput.value = state.hatchHours;
+  ddInput.value = state.dropDays;
+  dhInput.value = state.dropHours;
+
+  t0Input.addEventListener('change', () => {
+    const v = t0Input.value;
+    if (!v) return;
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) {
+      state.globalT0 = d;
+      saveToStorage();
+      renderAll();
+    }
+  });
+
+  batchInput.addEventListener('change', () => {
+    const v = parseInt(batchInput.value, 10);
+    if (v > 0 && v <= 30) {
+      state.batchIntervalDays = v;
+      saveToStorage();
+      renderAll();
+    }
+  });
+
+  hdInput.addEventListener('change', () => {
+    const v = parseInt(hdInput.value, 10);
+    if (v > 0 && v <= 30) {
+      state.hatchDays = v;
+      saveToStorage();
+      renderAll();
+    }
+  });
+  hhInput.addEventListener('change', () => {
+    const v = parseInt(hhInput.value, 10);
+    if (v >= 0 && v <= 23) {
+      state.hatchHours = v;
+      saveToStorage();
+      renderAll();
+    }
+  });
+
+  ddInput.addEventListener('change', () => {
+    const v = parseInt(ddInput.value, 10);
+    if (v > 0 && v <= 40) {
+      state.dropDays = v;
+      saveToStorage();
+      renderAll();
+    }
+  });
+  dhInput.addEventListener('change', () => {
+    const v = parseInt(dhInput.value, 10);
+    if (v >= 0 && v <= 23) {
+      state.dropHours = v;
+      saveToStorage();
+      renderAll();
+    }
+  });
+}
+
+buildPanelsDOM();
+bindInputs();
+updateClock();
+renderAll();
+
+setInterval(updateClock, 1000);
+setInterval(renderAll, 30 * 1000);
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) renderAll();
+});
+</script>
+
+</body>
+</html>

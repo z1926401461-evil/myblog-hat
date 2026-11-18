@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>交叉上蛋孵化工艺可视化</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #f8f3ea 0%, #eee3d2 100%);
+    color: #2f2418;
+    min-height: 100vh;
+  }
+
+  body { padding: 20px; transition: padding 0.3s ease; }
+
+  .container { max-width: 1280px; margin: 0 auto; }
+
+  h1 { font-size: 22px; margin-bottom: 6px; }
+  .subtitle { color: #8d7a66; font-size: 13px; margin-bottom: 20px; }
+
+  .card {
+    background: #fffdfa;
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    margin-bottom: 18px;
+    overflow: hidden;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .day-counter {
+    background: #2f2418;
+    color: #f5b13d;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    min-width: 90px;
+    text-align: center;
+  }
+  .day-counter.flash { animation: counter-flash 0.6s ease; }
+  @keyframes counter-flash { 50% { background: #c26613; color: #2f2418; } }
+  .stage-name { font-size: 15px; font-weight: 700; }
+
+  .stage-wrapper {
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+    transition: height 0.3s ease;
+  }
+
+  .stage {
+    width: 1100px;
+    height: 480px;
+    transform-origin: top left;
+    position: relative;
+  }
+
+  .incubator {
+    position: absolute;
+    left: 150px;
+    right: 150px;
+    top: 220px;
+    height: 240px;
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .side-label {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 4px;
+    padding: 10px 6px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .side-label.entry { background: linear-gradient(180deg,#4caf50,#2e7d32); color:#fffdfa; }
+  .side-label.exit  { background: linear-gradient(180deg,#ef5350,#c62828); color:#fffdfa; }
+
+  .track {
+    flex: 1;
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+
+  .slot-bg {
+    background: #faf5ec;
+    border: 2px dashed #e2d5c3;
+    border-radius: 12px;
+    height: 220px;
+    position: relative;
+  }
+
+  .slot-bg .slot-no {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    font-size: 12px;
+    color: #a3927b;
+    font-weight: 600;
+  }
+
+  .cart {
+    position: absolute;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid;
+    z-index: 2;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    will-change: left, top, opacity, transform;
+  }
+
+  .cart .egg-icon { font-size: 32px; margin-bottom: 4px; line-height: 1; }
+  .cart .day { font-size: 42px; font-weight: 800; line-height: 1; letter-spacing: -1.5px; }
+  .cart .day small { font-size: 14px; font-weight: 500; margin-left: 2px; opacity: 0.75; }
+  .cart .label { font-size: 12px; margin-top: 8px; font-weight: 700; opacity: 0.85; letter-spacing: 0.5px; }
+
+  .cart.checking {
+    animation: cart-flash 0.55s ease-in-out infinite;
+    z-index: 10;
+  }
+  @keyframes cart-flash {
+    0%,100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(217,119,6,0.7); }
+    50%     { transform: scale(1.06); box-shadow: 0 0 0 20px rgba(217,119,6,0); }
+  }
+
+  .cart.leaving {
+    transform: translateX(520px) scale(0.75);
+    opacity: 0;
+    transition: transform 2.4s cubic-bezier(0.55, 0, 0.85, 0.25),
+                opacity 1.8s ease-in 0.4s !important;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .description {
+    font-size: 13.5px;
+    line-height: 1.7;
+    color: #6b5d4d;
+    padding: 14px 16px;
+    background: #faf5ec;
+    border-left: 4px solid #f5b13d;
+    border-radius: 6px;
+    margin-top: 20px;
+    min-height: 76px;
+  }
+
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+
+  button {
+    background: #2f2418;
+    color: #fffdfa;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+  }
+  button:hover { background: #4a3423; transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+  button.primary { background: linear-gradient(135deg,#f5b13d,#c26613); color: #2f2418; }
+  button.primary:hover { background: linear-gradient(135deg,#f7c26a,#d97706); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  button.ghost { background: #f5eddf; color: #2f2418; border: 1px solid #e2d5c3; }
+  button.ghost:hover { background: #eee3d2; }
+
+  #landscapeBtn { display: none; }
+
+  @media (max-width: 900px) {
+    body { padding: 4px; }
+    .container { max-width: 100%; }
+    h1 { font-size: 14px; margin-bottom: 2px; }
+    .subtitle { font-size: 10px; margin-bottom: 8px; line-height: 1.4; }
+    .card { padding: 8px; border-radius: 8px; margin-bottom: 8px; }
+    .status-bar { gap: 6px; margin-bottom: 6px; }
+    .day-counter { padding: 4px 8px; font-size: 11px; min-width: 52px; border-radius: 5px; }
+    .stage-name { font-size: 11px; }
+    .description { font-size: 11px; padding: 6px 8px; min-height: auto; margin-top: 8px; line-height: 1.5; border-left-width: 3px; border-radius: 4px; }
+    .controls { gap: 5px; margin-top: 8px; }
+    button { padding: 6px 10px; font-size: 11px; border-radius: 6px; }
+    #landscapeBtn { display: inline-block; }
+  }
+
+  /* ============================================================
+     横屏模式
+     ============================================================ */
+  body.landscape {
+    overflow: hidden;
+    padding: 0;
+    background: #2f2418;
+  }
+  body.landscape h1,
+  body.landscape .subtitle,
+  body.landscape .description { display: none; }
+
+  body.landscape .container { max-width: none; margin: 0; padding: 0; }
+  body.landscape .card {
+    padding: 0;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    overflow: visible;
+  }
+  body.landscape .stage-wrapper {
+    overflow: visible;
+    height: 0;
+  }
+  body.landscape .stage {
+    position: fixed;
+    top: 0;
+    left: 0;
+    transform-origin: top left;
+  }
+
+  /* 横屏时状态栏浮在左上角 */
+  body.landscape .status-bar {
+    position: fixed;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.94);
+    padding: 6px 12px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    margin: 0;
+    gap: 10px;
+  }
+
+  /* 横屏时按钮浮在底部 */
+  body.landscape .controls {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.94);
+    padding: 8px 12px;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    margin: 0;
+    gap: 8px;
+    display: flex;
+    flex-wrap: nowrap;
+  }
+  body.landscape .controls button {
+    padding: 8px 14px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  /* ============================================================
+     深色模式（跟随宿主站点 data-theme）
+     ============================================================ */
+  :root[data-theme="dark"],
+  :root[data-theme="dark"] body {
+    background: linear-gradient(135deg, #1b1510 0%, #251c13 100%);
+    color: #ece3d6;
+  }
+  :root[data-theme="dark"] .subtitle { color: #b3a291; }
+
+  :root[data-theme="dark"] .card {
+    background: #221a13;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: 0 4px 22px rgba(0, 0, 0, 0.5);
+  }
+
+  :root[data-theme="dark"] .day-counter {
+    background: rgba(245, 177, 61, 0.16);
+    color: #f5b13d;
+    border: 1px solid rgba(245, 177, 61, 0.32);
+  }
+  :root[data-theme="dark"] .day-counter.flash { animation: counter-flash-dark 0.6s ease; }
+  @keyframes counter-flash-dark {
+    50% { background: #f5b13d; color: #1b1510; }
+  }
+
+  :root[data-theme="dark"] .slot-bg {
+    background: #1d1610;
+    border-color: #43331f;
+  }
+  :root[data-theme="dark"] .slot-bg .slot-no { color: #8a7761; }
+
+  :root[data-theme="dark"] .cart { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55); }
+
+  :root[data-theme="dark"] .description {
+    background: #1d1610;
+    color: #cbbdac;
+    border-left-color: #f5b13d;
+  }
+
+  :root[data-theme="dark"] button {
+    background: #3a2c1d;
+    color: #ece3d6;
+  }
+  :root[data-theme="dark"] button:hover { background: #4d3a25; }
+  :root[data-theme="dark"] button.primary {
+    background: linear-gradient(135deg, #f5b13d, #c26613);
+    color: #1b1510;
+  }
+  :root[data-theme="dark"] button.primary:hover {
+    background: linear-gradient(135deg, #f7c26a, #d97706);
+  }
+  :root[data-theme="dark"] button.ghost {
+    background: #2a2018;
+    color: #ece3d6;
+    border-color: #43331f;
+  }
+  :root[data-theme="dark"] button.ghost:hover { background: #352719; }
+  :root[data-theme="dark"] button:disabled { opacity: 0.32; }
+
+  :root[data-theme="dark"] body.landscape { background: #14100b; }
+  :root[data-theme="dark"] body.landscape .status-bar,
+  :root[data-theme="dark"] body.landscape .controls {
+    background: rgba(32, 23, 16, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  }
+</style>
+</head>
+<body>
+<script>
+/* 跟随宿主站点（博客）的深浅色；独立打开时跟随系统 */
+(function () {
+    var root = document.documentElement;
+    function apply(t) {
+        if (t === 'dark' || t === 'light') root.setAttribute('data-theme', t);
+    }
+    var pd = null;
+    try { if (window.parent && window.parent !== window) pd = window.parent.document; } catch (e) { pd = null; }
+    if (pd && pd.documentElement) {
+        apply(pd.documentElement.getAttribute('data-theme'));
+        try {
+            new MutationObserver(function () {
+                apply(pd.documentElement.getAttribute('data-theme'));
+            }).observe(pd.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        } catch (e) {}
+    } else {
+        // 与 Starlight 判断一致：以 light 是否匹配为准，两者都不匹配时按深色处理
+        var mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+        var mqLight = window.matchMedia('(prefers-color-scheme: light)');
+        var pick = function () { return mqDark.matches ? 'dark' : (mqLight.matches ? 'light' : 'dark'); };
+        apply(pick());
+        var onScheme = function () { apply(pick()); };
+        if (mqDark.addEventListener) { mqDark.addEventListener('change', onScheme); mqLight.addEventListener('change', onScheme); }
+    }
+})();
+</script>
+
+
+<div class="container">
+
+  <h1>🥚 交叉上蛋孵化工艺可视化</h1>
+  <p class="subtitle">5 车位鸭巷道孵化机 · 每 5 天上孵一批 · 第 11 天照蛋 · 第 24 天落盘</p>
+
+  <div class="card">
+    <div class="status-bar">
+      <div class="day-counter" id="dayCounter">第 0 天</div>
+      <div class="stage-name" id="stageName">初始上孵</div>
+    </div>
+
+    <div class="stage-wrapper" id="stageWrapper">
+      <div class="stage" id="stage">
+        <div class="incubator">
+          <div class="side-label entry">入口</div>
+          <div class="track" id="track">
+            <div class="slot-bg" data-slot="0"><span class="slot-no">第 1 车位</span></div>
+            <div class="slot-bg" data-slot="1"><span class="slot-no">第 2 车位</span></div>
+            <div class="slot-bg" data-slot="2"><span class="slot-no">第 3 车位</span></div>
+            <div class="slot-bg" data-slot="3"><span class="slot-no">第 4 车位</span></div>
+            <div class="slot-bg" data-slot="4"><span class="slot-no">第 5 车位</span></div>
+          </div>
+          <div class="side-label exit">出口</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="description" id="description">
+      第 1 批种蛋从入口推入第 1 车位，标记为 0 天。其余 4 个车位为空车。
+    </div>
+
+    <div class="controls">
+      <button class="primary" id="playBtn">▶ 播放</button>
+      <button id="prevBtn">← 上一步</button>
+      <button id="nextBtn">下一步 →</button>
+      <button id="resetBtn">重置</button>
+      <button class="ghost" id="landscapeBtn">↻ 切换横屏</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ==========================================================
+   批次配色板
+   ========================================================== */
+const PALETTE = [
+  { bg: 'linear-gradient(180deg,#fff3c4,#ffe38a)', border: '#e0a800', text: '#7a5a00' },
+  { bg: 'linear-gradient(180deg,#d4f1d5,#a5dfa8)', border: '#4caf50', text: '#1b5e20' },
+  { bg: 'linear-gradient(180deg,#c8e0ff,#9cc4ff)', border: '#2196f3', text: '#0d47a1' },
+  { bg: 'linear-gradient(180deg,#ffe0c0,#ffc78a)', border: '#ff9800', text: '#b45309' },
+  { bg: 'linear-gradient(180deg,#ffd1d1,#ffa8a8)', border: '#f44336', text: '#7f1d1d' },
+  { bg: 'linear-gradient(180deg,#e0d4ff,#c4b0ff)', border: '#7e57c2', text: '#4527a0' },
+  { bg: 'linear-gradient(180deg,#d4f5f0,#a5e8df)', border: '#26a69a', text: '#00695c' },
+  { bg: 'linear-gradient(180deg,#ffd4ec,#ffa8d8)', border: '#ec407a', text: '#880e4f' }
+];
+const colorOf = (batch) => PALETTE[(batch - 1) % PALETTE.length];
+
+/* ==========================================================
+   步骤数据
+   ========================================================== */
+const steps = [
+  { day: 0, stage: '初始上孵', desc: '第 1 批种蛋从入口推入第 1 车位，标记为 0 天。其余 4 个车位为空车。', cars: [{ batch: 1, age: 0, slot: 0 }] },
+  { day: 5, stage: '第 2 批上孵', desc: '第 1 批推到第 2 车位（5 天），第 2 批新蛋从入口推入第 1 车位（0 天）。', cars: [{ batch: 2, age: 0, slot: 0 }, { batch: 1, age: 5, slot: 1 }] },
+  { day: 10, stage: '第 3 批上孵', desc: '第 1 批推到第 3 车位（10 天），第 2 批推到第 2 车位（5 天），第 3 批新蛋推入第 1 车位（0 天）。', cars: [ { batch: 3, age: 0, slot: 0 }, { batch: 2, age: 5, slot: 1 }, { batch: 1, age: 10, slot: 2 } ] },
+  { day: 11, stage: '照蛋（第 3 车位 11 天）', desc: '第 3 车位的种蛋胚龄达到 11 天，从出口拉出执行照蛋。看清楚后点“下一步”，它会绕一圈回到入口，整列蛋车一起向前推进一格。', cars: [ { batch: 3, age: 1, slot: 0 }, { batch: 2, age: 6, slot: 1 }, { batch: 1, age: 11, slot: 2 } ], action: 'checking', targetBatch: 1 },
+  { day: 11, stage: '照蛋完成，整列推进一格', desc: '照蛋车从出口出去，绕孵化机上方飞回入口，停在入口左侧一个步长的位置。随后照蛋车和所有其他蛋车以相同速度、相同距离整体向前推进一格。', cars: [ { batch: 1, age: 11, slot: 0 }, { batch: 3, age: 1, slot: 1 }, { batch: 2, age: 6, slot: 2 } ], action: 'returning', targetBatch: 1 },
+  { day: 15, stage: '第 4 批上孵', desc: '过了 4 天。第 4 批新蛋推入第 1 车位，其余蛋车向前顶一格。', cars: [ { batch: 4, age: 0, slot: 0 }, { batch: 1, age: 15, slot: 1 }, { batch: 3, age: 5, slot: 2 }, { batch: 2, age: 10, slot: 3 } ] },
+  { day: 16, stage: '照蛋（第 4 车位 11 天）', desc: '第 4 车位种蛋胚龄 11 天，从出口拉出执行照蛋。看清楚了再点下一步。', cars: [ { batch: 4, age: 1, slot: 0 }, { batch: 1, age: 16, slot: 1 }, { batch: 3, age: 6, slot: 2 }, { batch: 2, age: 11, slot: 3 } ], action: 'checking', targetBatch: 2 },
+  { day: 16, stage: '照蛋完成，整列推进一格', desc: '照蛋车绕孵化机上方从入口推回第 1 车位，其他蛋车同时整体向前推进一格。', cars: [ { batch: 2, age: 11, slot: 0 }, { batch: 4, age: 1, slot: 1 }, { batch: 1, age: 16, slot: 2 }, { batch: 3, age: 6, slot: 3 } ], action: 'returning', targetBatch: 2 },
+  { day: 20, stage: '第 5 批上孵（满孵）', desc: '过了 4 天。第 5 批新蛋推入第 1 车位，5 个车位全部上满，进入满孵状态。', cars: [ { batch: 5, age: 0, slot: 0 }, { batch: 2, age: 15, slot: 1 }, { batch: 4, age: 5, slot: 2 }, { batch: 1, age: 20, slot: 3 }, { batch: 3, age: 10, slot: 4 } ] },
+  { day: 21, stage: '照蛋（第 5 车位 11 天）', desc: '第 5 车位种蛋胚龄 11 天，从出口拉出执行照蛋。看清楚了再点下一步。', cars: [ { batch: 5, age: 1, slot: 0 }, { batch: 2, age: 16, slot: 1 }, { batch: 4, age: 6, slot: 2 }, { batch: 1, age: 21, slot: 3 }, { batch: 3, age: 11, slot: 4 } ], action: 'checking', targetBatch: 3 },
+  { day: 21, stage: '照蛋完成，整列推进一格', desc: '照蛋车绕孵化机上方从入口推回第 1 车位，其他蛋车同时整体向前推进一格。', cars: [ { batch: 3, age: 11, slot: 0 }, { batch: 5, age: 1, slot: 1 }, { batch: 2, age: 16, slot: 2 }, { batch: 4, age: 6, slot: 3 }, { batch: 1, age: 21, slot: 4 } ], action: 'returning', targetBatch: 3 },
+  { day: 24, stage: '落盘（第 5 车位 24 天）', desc: '第 5 车位的种蛋胚龄达到 24 天，执行落盘——从出口缓慢滑出，转往出雏机，渐渐消失在屏幕外。第 5 车位从此空着。', cars: [ { batch: 3, age: 14, slot: 0 }, { batch: 5, age: 4, slot: 1 }, { batch: 2, age: 19, slot: 2 }, { batch: 4, age: 9, slot: 3 }, { batch: 1, age: 24, slot: 4, leaving: true } ], action: 'leaving', targetBatch: 1 },
+  { day: 25, stage: '空窗期', desc: '落盘后第 5 车位空着，休息一天。此时孵化机内只有 4 个车位有蛋，等待下一批新蛋入场。', cars: [ { batch: 3, age: 15, slot: 0 }, { batch: 5, age: 5, slot: 1 }, { batch: 2, age: 20, slot: 2 }, { batch: 4, age: 10, slot: 3 } ] },
+  { day: 26, stage: '上第 6 批蛋', desc: '第 6 批新蛋从入口推入第 1 车位，其余 4 辆蛋车依次向前顶一格。孵化机再次满孵。', cars: [ { batch: 6, age: 0, slot: 0 }, { batch: 3, age: 16, slot: 1 }, { batch: 5, age: 6, slot: 2 }, { batch: 2, age: 21, slot: 3 }, { batch: 4, age: 11, slot: 4 } ] },
+  { day: 26, stage: '照蛋（第 5 车位 11 天）', desc: '第 5 车位的第 4 批种蛋胚龄 11 天，从出口拉出执行照蛋。看清楚了再点下一步，它将绕一圈从入口回到第 1 车位，进入下一轮循环。', cars: [ { batch: 6, age: 0, slot: 0 }, { batch: 3, age: 16, slot: 1 }, { batch: 5, age: 6, slot: 2 }, { batch: 2, age: 21, slot: 3 }, { batch: 4, age: 11, slot: 4 } ], action: 'checking', targetBatch: 4 },
+  { day: 26, stage: '照蛋完成，整列推进一格', desc: '照蛋车绕孵化机上方从入口推回第 1 车位，其他蛋车同时整体向前推进一格。此刻车位排列与第 21 天照蛋后完全一致，进入下一轮循环。', cars: [ { batch: 4, age: 11, slot: 0 }, { batch: 6, age: 0, slot: 1 }, { batch: 3, age: 16, slot: 2 }, { batch: 5, age: 6, slot: 3 }, { batch: 2, age: 21, slot: 4 } ], action: 'returning', targetBatch: 4 }
+];
+
+/* ==========================================================
+   元素引用
+   ========================================================== */
+const track = document.getElementById('track');
+const stage = document.getElementById('stage');
+const stageWrapper = document.getElementById('stageWrapper');
+const dayCounter = document.getElementById('dayCounter');
+const stageName = document.getElementById('stageName');
+const description = document.getElementById('description');
+const playBtn = document.getElementById('playBtn');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const resetBtn = document.getElementById('resetBtn');
+const landscapeBtn = document.getElementById('landscapeBtn');
+
+const cartsEl = new Map();
+let currentStep = -1;
+let playing = false;
+let playTimer = null;
+let busy = false;
+
+const STAGE_W = 1100;
+const STAGE_H = 480;
+
+/* ==========================================================
+   布局：竖屏测量并缓存，横屏直接用缓存
+   ========================================================== */
+let cachedLayout = null;
+
+function measureLayout() {
+  const slots = track.querySelectorAll('.slot-bg');
+  const stageRect = stage.getBoundingClientRect();
+  const scale = (stageRect.width / STAGE_W) || 1;
+
+  if (slots.length < 2 || !stageRect.width || !scale) return null;
+
+  const s0 = slots[0].getBoundingClientRect();
+  const s1 = slots[1].getBoundingClientRect();
+  const trackRect = track.getBoundingClientRect();
+
+  const colWidth = s0.width / scale;
+  const step = (s1.left - s0.left) / scale;
+  const trackWidth = trackRect.width / scale;
+
+  return {
+    trackWidth,
+    step,
+    colWidth,
+    cartHeight: 220,
+    exitX: trackWidth + 120,
+    entryX: -colWidth - 120,
+    loopTop: -200
+  };
+}
+
+function getLayout() {
+  const isLandscape = document.body.classList.contains('landscape');
+
+  /* 横屏时绝对不测量（getBoundingClientRect 会被旋转影响），直接用缓存 */
+  if (isLandscape && cachedLayout) {
+    return cachedLayout;
+  }
+
+  const m = measureLayout();
+  if (m) {
+    if (!isLandscape) cachedLayout = m;
+    return m;
+  }
+
+  /* 兜底：极端情况下用默认值 */
+  return cachedLayout || {
+    trackWidth: 700, step: 152, colWidth: 140, cartHeight: 220,
+    exitX: 820, entryX: -260, loopTop: -200
+  };
+}
+
+function slotLeft(slot, layout) { return slot * layout.step; }
+
+/* ==========================================================
+   缩放
+   ========================================================== */
+function updateScale() {
+  if (document.body.classList.contains('landscape')) {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+
+    const S = Math.min(H / STAGE_W, W / STAGE_H);
+    const X = (W + STAGE_H * S) / 2;
+    const Y = (H - STAGE_W * S) / 2;
+
+    stage.style.transformOrigin = 'top left';
+    stage.style.transform = `translate(${X}px, ${Y}px) rotate(90deg) scale(${S})`;
+
+    /* 用缓存 layout 同步蛋车（不用重新测量） */
+    const layout = getLayout();
+    cartsEl.forEach((el) => {
+      const slot = parseInt(el.dataset.slot);
+      if (isNaN(slot)) return;
+      el.style.width = layout.colWidth + 'px';
+      el.style.height = layout.cartHeight + 'px';
+      el.style.left = slotLeft(slot, layout) + 'px';
+      el.style.top = '0px';
+    });
+    return;
+  }
+
+  /* 竖屏：常规等比缩放 */
+  const availableW = stageWrapper.clientWidth;
+  if (!availableW || availableW <= 0) return;
+  const scale = Math.min(availableW / STAGE_W, 1);
+  stage.style.transformOrigin = 'top left';
+  stage.style.transform = `scale(${scale})`;
+  stageWrapper.style.height = (STAGE_H * scale) + 'px';
+
+  const layout = getLayout();
+  cartsEl.forEach((el) => {
+    const slot = parseInt(el.dataset.slot);
+    if (isNaN(slot)) return;
+    el.style.transition = 'none';
+    el.style.width = layout.colWidth + 'px';
+    el.style.height = layout.cartHeight + 'px';
+    el.style.left = slotLeft(slot, layout) + 'px';
+    el.style.top = '0px';
+  });
+}
+
+if (typeof ResizeObserver !== 'undefined') {
+  const ro = new ResizeObserver(() => {
+    if (!document.body.classList.contains('landscape')) updateScale();
+  });
+  ro.observe(stageWrapper);
+}
+window.addEventListener('resize', updateScale);
+window.addEventListener('orientationchange', () => setTimeout(updateScale, 150));
+
+/* ==========================================================
+   蛋车 DOM
+   ========================================================== */
+function cartLabel(car) {
+  if (car.leaving) return '落盘';
+  if (car.age >= 24) return '待落盘';
+  return '孵化中';
+}
+
+function createCartElement(car, layout) {
+  const color = colorOf(car.batch);
+  const el = document.createElement('div');
+  el.className = 'cart';
+  el.dataset.batch = car.batch;
+  el.dataset.slot = car.slot;
+
+  el.style.background = color.bg;
+  el.style.borderColor = color.border;
+  el.style.color = color.text;
+  el.style.width = layout.colWidth + 'px';
+  el.style.height = layout.cartHeight + 'px';
+  el.style.left = slotLeft(car.slot, layout) + 'px';
+  el.style.top = '0px';
+
+  el.innerHTML = `
+    <div class="egg-icon">🥚</div>
+    <div class="day">${car.age}<small>天</small></div>
+    <div class="label">${cartLabel(car)}</div>
+  `;
+  return el;
+}
+
+function updateCartContent(el, car) {
+  el.querySelector('.day').innerHTML = `${car.age}<small>天</small>`;
+  el.querySelector('.label').textContent = cartLabel(car);
+  el.dataset.slot = car.slot;
+}
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+/* ==========================================================
+   照蛋车绕圈 + 整列同步推进
+   ========================================================== */
+async function moveCartViaLoopAndPush(el, layout, others) {
+  el.classList.remove('checking');
+  el.style.zIndex = '10';
+
+  el.style.transition = 'left 0.8s ease-in-out';
+  el.style.left = layout.exitX + 'px';
+  await sleep(850);
+
+  el.style.transition = 'top 0.6s ease-in-out';
+  el.style.top = layout.loopTop + 'px';
+  await sleep(650);
+
+  el.style.transition = 'left 1.4s ease-in-out';
+  el.style.left = (-layout.step) + 'px';
+  await sleep(1450);
+
+  el.style.transition = 'top 0.6s ease-in-out';
+  el.style.top = '0px';
+  await sleep(650);
+
+  const MOVE_DURATION = 900;
+  const easing = 'cubic-bezier(0.4, 0, 0.6, 1)';
+  el.style.transition = `left ${MOVE_DURATION}ms ${easing}`;
+  el.style.left = slotLeft(0, layout) + 'px';
+  others.forEach(item => {
+    item.el.style.transition = `left ${MOVE_DURATION}ms ${easing}`;
+    item.el.style.left = slotLeft(item.toSlot, layout) + 'px';
+  });
+  await sleep(MOVE_DURATION + 100);
+  el.style.zIndex = '2';
+}
+
+async function moveCartLeave(el) {
+  el.classList.add('leaving');
+  await sleep(2600);
+  if (el.parentNode) el.parentNode.removeChild(el);
+  cartsEl.delete(el.dataset.batch);
+}
+
+/* ==========================================================
+   渲染一个步骤
+   ========================================================== */
+async function renderStep(index) {
+  if (busy) return;
+  busy = true;
+
+  const step = steps[index];
+  const layout = getLayout();
+  const prevStep = index > 0 ? steps[index - 1] : null;
+  const prevMap = prevStep ? new Map(prevStep.cars.map(c => [c.batch, c])) : new Map();
+
+  dayCounter.textContent = `第 ${step.day} 天`;
+  dayCounter.classList.remove('flash');
+  void dayCounter.offsetWidth;
+  dayCounter.classList.add('flash');
+  stageName.textContent = step.stage;
+  description.textContent = step.desc;
+
+  for (const car of step.cars) {
+    const el = cartsEl.get(car.batch);
+    if (el) updateCartContent(el, car);
+  }
+
+  if (step.action === 'leaving' && step.targetBatch) {
+    const el = cartsEl.get(step.targetBatch);
+    if (el) moveCartLeave(el);
+  }
+
+  for (const car of step.cars) {
+    if (!cartsEl.has(car.batch)) {
+      const el = createCartElement(car, layout);
+      el.style.transition = 'none';
+      el.style.left = (-layout.colWidth - 60) + 'px';
+      el.style.top = '0px';
+      el.style.opacity = '0';
+      track.appendChild(el);
+      cartsEl.set(car.batch, el);
+      void el.offsetWidth;
+      el.style.transition = 'left 0.8s cubic-bezier(0.34, 1.1, 0.64, 1), opacity 0.4s ease';
+      el.style.left = slotLeft(car.slot, layout) + 'px';
+      el.style.opacity = '1';
+    }
+  }
+
+  await sleep(300);
+
+  if (step.action === 'checking' && step.targetBatch) {
+    const el = cartsEl.get(step.targetBatch);
+    if (el) el.classList.add('checking');
+    prevBtn.disabled = index === 0;
+    nextBtn.disabled = index === steps.length - 1;
+    busy = false;
+    return;
+  }
+
+  if (step.action === 'returning' && step.targetBatch) {
+    const others = [];
+    for (const car of step.cars) {
+      if (car.batch === step.targetBatch) continue;
+      const el = cartsEl.get(car.batch);
+      const prevCar = prevMap.get(car.batch);
+      if (el && prevCar && prevCar.slot !== car.slot) {
+        others.push({ el, toSlot: car.slot });
+      }
+    }
+    const targetEl = cartsEl.get(step.targetBatch);
+    if (targetEl) await moveCartViaLoopAndPush(targetEl, layout, others);
+  } else {
+    for (const car of step.cars) {
+      const el = cartsEl.get(car.batch);
+      const prevCar = prevMap.get(car.batch);
+      if (!el || !prevCar) continue;
+      if (prevCar.slot === car.slot) continue;
+      if (el.classList.contains('leaving')) continue;
+      el.style.transition = 'left 0.7s cubic-bezier(0.34, 1.1, 0.64, 1)';
+      el.style.left = slotLeft(car.slot, layout) + 'px';
+    }
+    await sleep(750);
+  }
+
+  cartsEl.forEach((el, batch) => {
+    if (!step.cars.find(c => c.batch === batch) && !el.classList.contains('leaving')) {
+      el.style.transition = 'opacity 0.4s ease';
+      el.style.opacity = '0';
+      setTimeout(() => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+        cartsEl.delete(batch);
+      }, 450);
+    }
+  });
+
+  await sleep(400);
+  prevBtn.disabled = index === 0;
+  nextBtn.disabled = index === steps.length - 1;
+  busy = false;
+}
+
+/* ==========================================================
+   控制逻辑
+   ========================================================== */
+async function goTo(index) {
+  if (busy) return;
+  if (index < 0 || index >= steps.length) return;
+  currentStep = index;
+  await renderStep(index);
+}
+
+function reset() {
+  pause();
+  cartsEl.forEach(el => { if (el.parentNode) el.parentNode.removeChild(el); });
+  cartsEl.clear();
+  currentStep = -1;
+  busy = false;
+  goTo(0);
+}
+
+function play() {
+  if (playing) return;
+  playing = true;
+  playBtn.textContent = '⏸ 暂停';
+  playBtn.classList.remove('primary');
+
+  const tick = async () => {
+    if (!playing) return;
+    if (currentStep >= steps.length - 1) {
+      await sleep(2000);
+      if (!playing) return;
+      cartsEl.forEach(el => { if (el.parentNode) el.parentNode.removeChild(el); });
+      cartsEl.clear();
+      currentStep = -1;
+      await sleep(200);
+      await goTo(0);
+    } else {
+      await goTo(currentStep + 1);
+    }
+    if (playing) {
+      const isChecking = steps[currentStep]?.action === 'checking';
+      playTimer = setTimeout(tick, isChecking ? 2800 : 700);
+    }
+  };
+  tick();
+}
+
+function pause() {
+  playing = false;
+  playBtn.textContent = '▶ 播放';
+  playBtn.classList.add('primary');
+  if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+}
+
+playBtn.addEventListener('click', () => { playing ? pause() : play(); });
+nextBtn.addEventListener('click', async () => {
+  if (busy) return;
+  pause();
+  if (currentStep < steps.length - 1) {
+    await goTo(currentStep + 1);
+  } else {
+    await sleep(1200);
+    cartsEl.forEach(el => { if (el.parentNode) el.parentNode.removeChild(el); });
+    cartsEl.clear();
+    currentStep = -1;
+    busy = false;
+    await goTo(0);
+    play();
+  }
+});
+prevBtn.addEventListener('click', async () => {
+  if (busy) return;
+  pause();
+  if (currentStep > 0) await goTo(currentStep - 1);
+});
+resetBtn.addEventListener('click', reset);
+
+/* ============ 横屏切换 ============ */
+landscapeBtn.addEventListener('click', () => {
+  const nowLandscape = !document.body.classList.contains('landscape');
+  document.body.classList.toggle('landscape');
+  landscapeBtn.textContent = nowLandscape ? '↻ 切换竖屏' : '↻ 切换横屏';
+
+  /* 切横屏之前，先确保有一份竖屏 layout 缓存 */
+  if (nowLandscape && !cachedLayout) {
+    const m = measureLayout();
+    if (m) cachedLayout = m;
+  }
+
+  updateScale();
+  setTimeout(updateScale, 30);
+  setTimeout(updateScale, 120);
+  setTimeout(updateScale, 350);
+});
+
+window.addEventListener('load', () => {
+  updateScale();
+  requestAnimationFrame(updateScale);
+  setTimeout(updateScale, 100);
+  setTimeout(updateScale, 400);
+});
+updateScale();
+goTo(0);
+</script>
+
+</body>
+</html>

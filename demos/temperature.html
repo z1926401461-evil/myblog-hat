@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 关键：确保手机端按设备宽度渲染 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>温湿度对照查算表</title>
+    <style>
+        :root {
+            --primary-color: #4a3417;
+            --bg-color: #f7f2ea;
+            --border-color: #e2d5c3;
+            --highlight-intersection-bg: #c26613;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 5px;
+            display: flex;
+            justify-content: center;
+            -webkit-text-size-adjust: 100%; /* 防止iOS字体放大 */
+        }
+
+        .container {
+            background: #fffdfa;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            padding: 10px;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+
+        .header h2 {
+            margin: 0;
+            color: var(--primary-color);
+            font-size: 16px;
+        }
+
+        .toggle-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: background-color 0.3s;
+            white-space: nowrap; /* 按钮文字不换行 */
+        }
+
+        .table-wrapper {
+            overflow-x: auto; /* 允许横向滑动 */
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 320px; /* 最小保证能看清字 */
+            table-layout: fixed; /* 固定列宽布局，让列宽均匀 */
+            font-size: 11px; /* 基础字体缩小 */
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 4px 1px; /* 大幅缩小边距 */
+            text-align: center;
+            word-break: break-all;
+        }
+
+        /* 表头样式 */
+        thead th {
+            background-color: #f6efe2;
+            color: var(--primary-color);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            cursor: pointer;
+        }
+
+        thead th:first-child {
+            position: sticky;
+            left: 0;
+            top: 0;
+            z-index: 20;
+            background-color: #efe5d4;
+            width: 40px; /* 固定第一列宽度 */
+        }
+
+        /* 行头样式 */
+        tbody th {
+            background-color: #f6efe2;
+            color: var(--primary-color);
+            font-weight: 600;
+            position: sticky;
+            left: 0;
+            z-index: 5;
+            cursor: pointer;
+        }
+
+        /* 高亮样式 */
+        thead th:not(:first-child):hover,
+        tbody th:hover {
+            background-color: #f5d9a8;
+            color: #7c3f04;
+        }
+
+        th.active-col, th.active-row {
+            background-color: #f5d9a8 !important;
+            color: #000;
+        }
+
+        td.highlight-col, td.highlight-row {
+            background-color: #f9edd8 !important;
+        }
+
+        td.highlight-intersection {
+            background-color: var(--highlight-intersection-bg) !important;
+            color: #fffdfa !important;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        /* 顶部操作引导：让人一眼知道表可以点 */
+        .howto {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin: 0 0 8px;
+            padding: 9px 11px;
+            border-radius: 10px;
+            border: 1px solid #f0dcb4;
+            border-left: 3px solid #c26613;
+            background: linear-gradient(135deg, #fdf5e6, #f9edd8);
+            font-size: 12px;
+            line-height: 1.65;
+            color: #6b5d4d;
+        }
+
+        .howto-ico {
+            flex: 0 0 auto;
+            font-size: 15px;
+            line-height: 1.45;
+            animation: howto-nudge 1.8s ease-in-out infinite;
+        }
+
+        @keyframes howto-nudge {
+            0%, 100% { transform: translateX(0); }
+            50%      { transform: translateX(3px); }
+        }
+
+        .howto b { color: #4a3417; }
+
+        .howto em {
+            font-style: normal;
+            font-weight: 700;
+            color: #a1560f;
+            background: #fbe8c4;
+            border-radius: 4px;
+            padding: 0 4px;
+            white-space: nowrap;
+        }
+
+        .howto .step {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            line-height: 15px;
+            text-align: center;
+            border-radius: 50%;
+            background: #c26613;
+            color: #fffdfa;
+            font-size: 10px;
+            font-weight: 700;
+            margin-right: 2px;
+            vertical-align: 1px;
+        }
+
+        .howto-result {
+            margin-top: 5px;
+            padding-top: 5px;
+            border-top: 1px dashed #e6cf9e;
+            font-size: 11.5px;
+            color: #8d7a66;
+        }
+
+        /* 针对特别窄的手机屏幕（如宽度小于 375px）进一步缩放 */
+        @media (max-width: 375px) {
+            th, td {
+                font-size: 10px;
+                padding: 3px 0px;
+            }
+            .header h2 {
+                font-size: 14px;
+            }
+            .toggle-btn {
+                font-size: 10px;
+                padding: 5px 8px;
+            }
+        }
+    
+        /* ===== 深色模式（跟随博客站点） ===== */
+        :root[data-theme="dark"] {
+            --primary-color: #f0a352;
+            --bg-color: #17120e;
+            --border-color: #3a3026;
+            --highlight-intersection-bg: #c26613;
+        }
+        :root[data-theme="dark"] body { color: #f2e8dc; }
+        :root[data-theme="dark"] .container {
+            background: #221b15 !important;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55) !important;
+        }
+        :root[data-theme="dark"] .header h2 { color: #f2e8dc; }
+        :root[data-theme="dark"] .toggle-btn {
+            background: #2a2219 !important;
+            color: #ffd79b !important;
+            border-color: #4a3c2d !important;
+        }
+        :root[data-theme="dark"] .howto {
+            background: linear-gradient(135deg, #241d16, #2b231a) !important;
+            border-color: #473a2c !important;
+            border-left-color: #c26613 !important;
+            color: #cbbcab !important;
+        }
+        :root[data-theme="dark"] .howto b { color: #f2e8dc; }
+        :root[data-theme="dark"] .howto em { background: #3b2d1c; color: #ffce8a; }
+        :root[data-theme="dark"] .howto-result { border-top-color: #473a2c; color: #a4937e; }
+        :root[data-theme="dark"] .table-wrapper {
+            background: #221b15 !important;
+            border-color: #3a3026 !important;
+        }
+        :root[data-theme="dark"] th,
+        :root[data-theme="dark"] td {
+            border-color: #352c22 !important;
+            color: #e6d9c8;
+        }
+        :root[data-theme="dark"] thead th {
+            background: #2a2219 !important;
+            color: #f0e2cf !important;
+        }
+        :root[data-theme="dark"] tbody th {
+            background: #241d16 !important;
+            color: #d8c7b0 !important;
+        }
+        :root[data-theme="dark"] tbody tr:nth-child(even) td { background: #241d16; }
+        :root[data-theme="dark"] td.highlight-col,
+        :root[data-theme="dark"] td.highlight-row { background-color: #382a1a !important; }
+        :root[data-theme="dark"] th.active-col,
+        :root[data-theme="dark"] th.active-row { background-color: #4a3620 !important; color: #ffd79b !important; }
+        :root[data-theme="dark"] thead th:not(:first-child):hover,
+        :root[data-theme="dark"] tbody th:hover { background-color: #42311c !important; color: #ffd79b !important; }
+    </style>
+</head>
+<body>
+<script>
+/* 跟随宿主站点（博客）的深浅色；独立打开时跟随系统 */
+(function () {
+    var root = document.documentElement;
+    function apply(t) {
+        if (t === 'dark' || t === 'light') root.setAttribute('data-theme', t);
+    }
+    var pd = null;
+    try { if (window.parent && window.parent !== window) pd = window.parent.document; } catch (e) { pd = null; }
+    if (pd && pd.documentElement) {
+        apply(pd.documentElement.getAttribute('data-theme'));
+        try {
+            new MutationObserver(function () {
+                apply(pd.documentElement.getAttribute('data-theme'));
+            }).observe(pd.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        } catch (e) {}
+    } else {
+        // 与 Starlight 判断一致：以 light 是否匹配为准，两者都不匹配时按深色处理
+        var mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+        var mqLight = window.matchMedia('(prefers-color-scheme: light)');
+        var pick = function () { return mqDark.matches ? 'dark' : (mqLight.matches ? 'light' : 'dark'); };
+        apply(pick());
+        var onScheme = function () { apply(pick()); };
+        if (mqDark.addEventListener) { mqDark.addEventListener('change', onScheme); mqLight.addEventListener('change', onScheme); }
+    }
+})();
+</script>
+
+
+<div class="container">
+    <div class="header">
+        <h2>相对湿度查算表</h2>
+        <button id="modeToggle" class="toggle-btn">切换湿球温度</button>
+    </div>
+    
+    <div class="howto">
+        <span class="howto-ico">👆</span>
+        <span class="howto-txt">
+            <b>查法：</b>
+            <span class="step">1</span>点表头里的<em>干球温度</em>（如 37.5）→
+            <span class="step">2</span>点最左侧的<em id="howto-rowname">干湿差</em>（如 5.0）→
+            两处交叉的深色格子，就是要查的<em>相对湿度</em>。
+            <span class="howto-result">右上角按钮可在「干湿差」和「湿球温度」两种查法之间切换；再点一次同一个数字可取消选择。</span>
+        </span>
+    </div>
+
+    <div class="table-wrapper">
+        <table id="humidityTable">
+            <thead></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const diffs = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12, 12.5, 13, 13.5, 14, 14.5, 15, 15.5, 16, 16.5];
+    const dryTemps = [35, 35.5, 36, 36.5, 37, 37.5, 38, 38.5, 39, 39.5, 40];
+
+    const data = [
+        [97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97], [93, 93, 94, 94, 94, 94, 94, 94, 94, 94, 94],
+        [90, 90, 90, 90, 91, 91, 91, 91, 91, 91, 91], [87, 87, 87, 87, 87, 88, 88, 88, 88, 88, 88],
+        [84, 84, 84, 84, 84, 85, 85, 85, 85, 85, 85], [81, 81, 81, 81, 82, 82, 82, 82, 82, 82, 82],
+        [78, 78, 78, 79, 79, 79, 79, 79, 79, 79, 80], [75, 75, 76, 76, 76, 76, 76, 76, 77, 77, 77],
+        [72, 73, 73, 73, 73, 73, 74, 74, 74, 74, 74], [70, 70, 70, 70, 70, 71, 71, 71, 71, 72, 72],
+        [67, 67, 67, 68, 68, 68, 68, 69, 69, 69, 69], [64, 64, 65, 65, 65, 65, 66, 66, 66, 66, 67],
+        [61, 62, 62, 62, 62, 63, 63, 63, 64, 64, 64], [59, 59, 60, 60, 60, 60, 61, 61, 61, 62, 62],
+        [56, 57, 57, 57, 58, 58, 58, 59, 59, 59, 60], [54, 54, 55, 55, 55, 56, 56, 56, 57, 57, 57],
+        [51, 52, 52, 53, 53, 53, 54, 54, 54, 55, 55], [49, 49, 50, 50, 51, 51, 51, 52, 52, 52, 53],
+        [47, 47, 48, 48, 48, 49, 49, 50, 50, 50, 51], [44, 45, 45, 46, 46, 47, 47, 47, 48, 48, 48],
+        [42, 43, 43, 44, 44, 44, 45, 45, 46, 46, 46], [40, 40, 41, 41, 42, 42, 43, 43, 44, 44, 44],
+        [38, 38, 39, 39, 40, 40, 41, 41, 42, 42, 42], [36, 36, 37, 37, 38, 38, 39, 39, 40, 40, 40],
+        [34, 34, 35, 35, 36, 36, 37, 37, 38, 38, 38], [32, 32, 33, 33, 34, 34, 35, 35, 36, 36, 37],
+        [30, 30, 31, 31, 32, 32, 33, 33, 34, 34, 35], [28, 28, 29, 29, 30, 30, 31, 31, 32, 32, 33],
+        [26, 26, 27, 27, 28, 29, 29, 30, 30, 31, 31], [24, 24, 25, 26, 26, 27, 27, 28, 28, 29, 29],
+        [22, 23, 23, 24, 24, 25, 26, 26, 27, 27, 28], [20, 21, 21, 22, 23, 23, 24, 24, 25, 25, 26],
+        [18, 19, 20, 20, 21, 21, 22, 23, 23, 24, 24]
+    ];
+
+    const wetbulbTemps = [];
+    for (let t = 39.5; t >= 18.5; t -= 0.5) {
+        wetbulbTemps.push(Math.round(t * 10) / 10);
+    }
+
+    let currentMode = 'diff';
+    let selectedRow = null;
+    let selectedCol = null;
+
+    const table = document.getElementById('humidityTable');
+    const modeToggleBtn = document.getElementById('modeToggle');
+
+    function renderTable() {
+        table.querySelector('thead').innerHTML = '';
+        table.querySelector('tbody').innerHTML = '';
+        selectedRow = null;
+        selectedCol = null;
+
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+
+        const headerRow = document.createElement('tr');
+        const cornerTh = document.createElement('th');
+        // 手机端表头文字极度精简
+        cornerTh.innerHTML = currentMode === 'diff' ? '温差<br>℃' : '湿球<br>℃';
+        cornerTh.style.cursor = 'default';
+        headerRow.appendChild(cornerTh);
+
+        dryTemps.forEach((temp, colIndex) => {
+            const th = document.createElement('th');
+            th.textContent = temp;
+            th.dataset.col = colIndex;
+            th.addEventListener('click', () => selectCol(colIndex));
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+
+        const rowHeaders = currentMode === 'diff' ? diffs : wetbulbTemps;
+
+        rowHeaders.forEach((rowVal, rowIndex) => {
+            const tr = document.createElement('tr');
+            const rowTh = document.createElement('th');
+            rowTh.textContent = rowVal;
+            rowTh.dataset.row = rowIndex;
+            rowTh.addEventListener('click', () => selectRow(rowIndex));
+            tr.appendChild(rowTh);
+
+            dryTemps.forEach((dryTemp, colIndex) => {
+                const td = document.createElement('td');
+                let cellValue = '-';
+
+                if (currentMode === 'diff') {
+                    cellValue = data[rowIndex][colIndex];
+                } else {
+                    const diff = dryTemp - rowVal;
+                    const roundedDiff = Math.round(diff * 10) / 10;
+                    const diffIndex = diffs.indexOf(roundedDiff);
+                    if (diffIndex !== -1) {
+                        cellValue = data[diffIndex][colIndex];
+                    }
+                }
+
+                td.textContent = cellValue;
+                td.dataset.row = rowIndex;
+                td.dataset.col = colIndex;
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+    }
+
+    function selectCol(colIndex) {
+        document.querySelectorAll('thead th').forEach(th => th.classList.remove('active-col'));
+        document.querySelectorAll('td').forEach(td => td.classList.remove('highlight-col', 'highlight-intersection'));
+        selectedCol = colIndex;
+        const headerThs = document.querySelectorAll('thead tr th');
+        if(headerThs[colIndex + 1]) headerThs[colIndex + 1].classList.add('active-col');
+        document.querySelectorAll(`td[data-col="${colIndex}"]`).forEach(td => td.classList.add('highlight-col'));
+        checkIntersection();
+    }
+
+    function selectRow(rowIndex) {
+        document.querySelectorAll('tbody th').forEach(th => th.classList.remove('active-row'));
+        document.querySelectorAll('td').forEach(td => td.classList.remove('highlight-row', 'highlight-intersection'));
+        selectedRow = rowIndex;
+        const tbodyThs = document.querySelectorAll('tbody tr th');
+        if(tbodyThs[rowIndex]) tbodyThs[rowIndex].classList.add('active-row');
+        document.querySelectorAll(`td[data-row="${rowIndex}"]`).forEach(td => td.classList.add('highlight-row'));
+        checkIntersection();
+    }
+
+    function checkIntersection() {
+        if (selectedRow !== null && selectedCol !== null) {
+            const intersection = document.querySelector(`td[data-row="${selectedRow}"][data-col="${selectedCol}"]`);
+            if (intersection) intersection.classList.add('highlight-intersection');
+        }
+    }
+
+        const rowNameEl = document.getElementById('howto-rowname');
+        if (rowNameEl) rowNameEl.textContent = currentMode === 'diff' ? '干湿差' : '湿球温度';
+
+        modeToggleBtn.addEventListener('click', () => {
+        if (currentMode === 'diff') {
+            currentMode = 'wetbulb';
+            modeToggleBtn.textContent = '切换温差';
+        } else {
+            currentMode = 'diff';
+            modeToggleBtn.textContent = '切换湿球温度';
+        }
+        const howtoRow = document.getElementById('howto-rowname');
+        if (howtoRow) howtoRow.textContent = currentMode === 'diff' ? '干湿差' : '湿球温度';
+        renderTable();
+    });
+
+    renderTable();
+</script>
+</body>
+</html>
